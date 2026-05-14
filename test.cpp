@@ -1,35 +1,67 @@
 #include <iostream>
 #include <thread>
 #include <mutex>
-#include <chrono> // 使用 C++11 标准时间库
+#include <condition_variable>
+#include <utility>
+#include <vector>
+#include <queue>
+#include<functional>
 using namespace std;
 
-mutex m1, m2;
-
-void func1() {
-    //使用 lock 同时锁定多个互斥量，内部算法会避免死锁
-    lock(m1, m2);
-    // 使用 adopt_lock 告诉 lock_guard 互斥量已经被锁定了，只需负责在退出时自动解锁
-    lock_guard<mutex> lock1(m1, adopt_lock);
-    lock_guard<mutex> lock2(m2, adopt_lock);
-
-    this_thread::sleep_for(chrono::milliseconds(100));
+class ThreadPool{
+public:
+    ThreadPool(int threadnum):stopSignal(false){
+        for(int i=0;i<threadnum;i++){
+            threads.emplace_back([this](){
+                while(1){
+                    unique_lock<mutex> lock(mtx);
+                    cv.wait(lock,[this](){//返回false唤醒，即当任务队列不为空，或线程未停止
+                        if(!tasks.empty()==false || stopSignal==false){
+                        return false;
+                        }
+                    });
+                    if(tasks.empty()&&stopSignal){
+                        return ;
+                    }
+                    //获取任务-----
+                    function<void()> task(move(tasks.front()));
+                    tasks.pop();
+                    task();
+                    lock.unlock();
+            }       //---
+        });
+    }        
+            
 }
 
-void func2() {
-    // 同样使用 lock 一次性获取，顺序已经不影响了
-    lock(m1, m2);
-    lock_guard<mutex> lock1(m1, adopt_lock);
-    lock_guard<mutex> lock2(m2, adopt_lock);
+    //打包函数-----
+    template<class F,class...Args>
+    void enqueue(F&& f,Args&&... args){
+        function<void()> task(bind(forward<F>(f),forward<Args>(args)...));
+        {
+            unique_lock<mutex>mtx;
+            tasks.emplace(task);
+        }
+        cv.notify_one();
+    }
+    //---
 
-    this_thread::sleep_for(chrono::milliseconds(100)); // 模拟线程在工作
-}
 
-int main() {
-    thread t1(func1);
-    thread t2(func2);
-    t1.join();
-    t2.join();
-    cout << "程序结束" << endl;
-    return 0;
-}
+    ~ThreadPool(){
+        
+        if(tasks.empty()&&stopSignal){
+            for(auto &it : threads){
+                it.join();
+            }
+        }
+    }
+private:
+    //线程数组
+    vector<thread> threads;
+    //任务队列
+    queue<function<void()>> tasks;
+    //互斥锁，条件变量，线程池停止标志
+    mutex mtx;
+    condition_variable cv;
+    bool stopSignal;
+};

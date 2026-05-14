@@ -12,8 +12,14 @@
 
 4.[互斥量死锁问题&用c++11解决](互斥量死锁问题.md)
 
-4.[lock_guard和unique_lock](lock_guard和unique_lock.md)
+5.[lock_guard和unique_lock](lock_guard和unique_lock.md)
 
-5.[call_once和once_flag](call_once与其使用场景.md)
+6.[call_once和once_flag](call_once与其使用场景.md)
 
-6.[condition_variable条件变量](condition_variable.md)
+7.[condition_variable条件变量](condition_variable.md)
+
+8.[跨平台线程池](跨平台线程池.md)
+
+9.[异步并发](异步并发.md)
+
+10.[原子操作](原子操作.md)
